@@ -18,7 +18,7 @@ class UpdateService {
   static const _repo = 'calculadora_combustivel';
 
   // Manter sincronizado com pubspec.yaml → version
-  static const _versaoAtual = '1.0.1';
+  static const _versaoAtual = '1.0.2';
 
   static Future<UpdateInfo?> verificar() async {
     try {
