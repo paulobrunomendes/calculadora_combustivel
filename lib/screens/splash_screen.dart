@@ -79,7 +79,7 @@ class _SplashScreenState extends State<SplashScreen>
             ),
             const SizedBox(height: 28),
             const Text(
-              'Controle de Combustível',
+              'Abast Smart',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 20,

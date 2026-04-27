@@ -31,7 +31,7 @@ class _CombustivelAppState extends State<CombustivelApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Controle de Combustível',
+      title: 'Abast Smart',
       debugShowCheckedModeBanner: false,
       themeMode: _themeMode,
       theme: ThemeData(

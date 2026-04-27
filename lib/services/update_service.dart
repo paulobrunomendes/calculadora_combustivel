@@ -1,5 +1,9 @@
+import 'dart:io';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:open_file/open_file.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path_provider/path_provider.dart';
 
 class UpdateInfo {
   final String versao;
@@ -17,11 +21,11 @@ class UpdateService {
   static const _owner = 'paulobrunomendes';
   static const _repo = 'calculadora_combustivel';
 
-  // Manter sincronizado com pubspec.yaml → version
-  static const _versaoAtual = '1.0.2';
-
   static Future<UpdateInfo?> verificar() async {
     try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      final versaoAtual = packageInfo.version;
+
       final response = await http
           .get(
             Uri.parse(
@@ -35,9 +39,8 @@ class UpdateService {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       final tag = (data['tag_name'] as String).replaceFirst('v', '');
 
-      if (!_maisRecente(tag, _versaoAtual)) return null;
+      if (!_maisRecente(tag, versaoAtual)) return null;
 
-      // Prefere o .apk direto; se não tiver, usa a página do release
       String url = data['html_url'] as String;
       for (final asset in (data['assets'] as List)) {
         if ((asset['name'] as String).endsWith('.apk')) {
@@ -53,6 +56,30 @@ class UpdateService {
     } catch (_) {
       return null;
     }
+  }
+
+  static Future<void> baixarEInstalar(
+    String url, {
+    void Function(double progresso)? onProgress,
+  }) async {
+    final dir = await getTemporaryDirectory();
+    final file = File('${dir.path}/abast_smart_update.apk');
+
+    final request = http.Request('GET', Uri.parse(url));
+    final response = await http.Client().send(request);
+
+    final total = response.contentLength ?? 0;
+    var recebido = 0;
+    final bytes = <int>[];
+
+    await for (final chunk in response.stream) {
+      bytes.addAll(chunk);
+      recebido += chunk.length;
+      if (total > 0) onProgress?.call(recebido / total);
+    }
+
+    await file.writeAsBytes(bytes);
+    await OpenFile.open(file.path);
   }
 
   static bool _maisRecente(String remota, String local) {

@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:home_widget/home_widget.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../config.dart';
 import '../main.dart';
 import '../models/viagem.dart';
@@ -84,6 +85,8 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _comparadorMsg;
   bool _etanolCompensa = false;
 
+  String _versaoApp = '';
+
   static const _azulPrimario = Color(0xFF2563EB);
   static const _verde = Color(0xFF10b981);
   static const _brasilCenter = LatLng(-15.7801, -47.9292);
@@ -91,6 +94,9 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    PackageInfo.fromPlatform().then((info) {
+      setState(() => _versaoApp = info.version);
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) => _checarAtualizacao());
     _carregarUltimosValores();
     _precoGasolinaCompController.addListener(_calcularComparador);
@@ -828,7 +834,7 @@ class _HomeScreenState extends State<HomeScreen> {
       '💧 Litros necessários: ${_litrosUsados!.toStringAsFixed(2)} L\n'
       '💰 Custo estimado: R\$ ${_resultado!.toStringAsFixed(2)}\n'
       '$pedagioTxt'
-      '\nCalculado com *Controle de Combustível* 📱',
+      '\nCalculado com *Abast Smart* 📱',
     );
     final url = Uri.parse('https://wa.me/?text=$texto');
     if (await canLaunchUrl(url)) launchUrl(url);
@@ -853,66 +859,101 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _mostrarDialogAtualizacao(UpdateInfo info) {
+    double? progresso;
+    bool baixando = false;
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            const Icon(Icons.system_update, color: Color(0xFF2563EB)),
-            const SizedBox(width: 10),
-            Text('Versão ${info.versao} disponível',
-                style: const TextStyle(fontSize: 16)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Uma nova versão do app está disponível. Atualize para ter as últimas melhorias e correções.',
-              style: TextStyle(fontSize: 14),
-            ),
-            if (info.notas.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2563EB).withAlpha(20),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  info.notas,
-                  style: const TextStyle(fontSize: 12),
-                  maxLines: 5,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              const Icon(Icons.system_update, color: Color(0xFF2563EB)),
+              const SizedBox(width: 10),
+              Text('Versão ${info.versao} disponível',
+                  style: const TextStyle(fontSize: 16)),
             ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Uma nova versão do app está disponível. Atualize para ter as últimas melhorias e correções.',
+                style: TextStyle(fontSize: 14),
+              ),
+              if (info.notas.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2563EB).withAlpha(20),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    info.notas,
+                    style: const TextStyle(fontSize: 12),
+                    maxLines: 5,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+              if (baixando) ...[
+                const SizedBox(height: 16),
+                LinearProgressIndicator(
+                  value: progresso,
+                  backgroundColor: const Color(0xFF2563EB).withAlpha(30),
+                  color: const Color(0xFF2563EB),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  progresso == null
+                      ? 'Iniciando download...'
+                      : 'Baixando... ${(progresso! * 100).toInt()}%',
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            if (!baixando)
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Agora não'),
+              ),
+            ElevatedButton.icon(
+              onPressed: baixando
+                  ? null
+                  : () async {
+                      setDialogState(() => baixando = true);
+                      await UpdateService.baixarEInstalar(
+                        info.downloadUrl,
+                        onProgress: (p) =>
+                            setDialogState(() => progresso = p),
+                      );
+                      if (ctx.mounted) Navigator.pop(ctx);
+                    },
+              icon: baixando
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.download, size: 18),
+              label: Text(baixando ? 'Baixando...' : 'Instalar agora'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2563EB),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Agora não'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              final uri = Uri.parse(info.downloadUrl);
-              if (await canLaunchUrl(uri)) launchUrl(uri);
-            },
-            icon: const Icon(Icons.download, size: 18),
-            label: const Text('Baixar atualização'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2563EB),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -964,7 +1005,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      '🚗 Controle de Combustível',
+                      '⛽ Abast Smart',
                       style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.bold,
@@ -1801,7 +1842,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 12),
             Text(
-              'Controle de Combustível',
+              'Abast Smart',
               style: TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.bold,
@@ -1810,7 +1851,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Versão 1.0.0',
+              'Versão $_versaoApp',
               style: TextStyle(fontSize: 13, color: corSub),
             ),
             const SizedBox(height: 20),
