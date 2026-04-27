@@ -62,7 +62,10 @@
       "Bash(git remote *)",
       "Bash(git push *)",
       "Bash(git reset *)",
-      "Bash(git update-ref *)"
+      "Bash(git update-ref *)",
+      "Bash(gh *)",
+      "Bash(curl -s \"https://api.github.com/repos/paulobrunomendes/calculadora_combustivel/releases/latest\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('Tag:', d.get\\('tag_name'\\)\\); print\\('Nome:', d.get\\('name'\\)\\); print\\('URL:', d.get\\('html_url'\\)\\)\")"
     ]
   }
 }

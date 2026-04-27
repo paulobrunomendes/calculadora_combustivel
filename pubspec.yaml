@@ -1,6 +1,6 @@
 name: combustivel_app
 description: Aplicativo de controle de combustível
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -15,6 +15,7 @@ dependencies:
   cupertino_icons: ^1.0.6
   geolocator: ^13.0.2
   url_launcher: ^6.3.1
+  home_widget: ^0.5.0
 
 dev_dependencies:
   flutter_test:

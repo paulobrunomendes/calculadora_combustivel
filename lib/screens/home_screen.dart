@@ -6,6 +6,8 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:home_widget/home_widget.dart';
 import '../config.dart';
 import '../main.dart';
 import '../models/viagem.dart';
@@ -76,6 +78,12 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _debounceOrigem;
   Timer? _debounceDestino;
 
+  // Comparador Gasolina vs Etanol
+  final _precoGasolinaCompController = TextEditingController();
+  final _precoEtanolCompController = TextEditingController();
+  String? _comparadorMsg;
+  bool _etanolCompensa = false;
+
   static const _azulPrimario = Color(0xFF2563EB);
   static const _verde = Color(0xFF10b981);
   static const _brasilCenter = LatLng(-15.7801, -47.9292);
@@ -84,6 +92,9 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _checarAtualizacao());
+    _carregarUltimosValores();
+    _precoGasolinaCompController.addListener(_calcularComparador);
+    _precoEtanolCompController.addListener(_calcularComparador);
     _origemFocus.addListener(() {
       if (!_origemFocus.hasFocus) {
         Future.delayed(const Duration(milliseconds: 200), () {
@@ -748,6 +759,91 @@ class _HomeScreenState extends State<HomeScreen> {
           : null,
     );
     HistoricoService.adicionarViagem(viagem);
+    _salvarUltimosValores();
+    _atualizarWidget();
+  }
+
+  // ── Salvar / carregar últimos valores ────────────────────────────────────
+
+  Future<void> _carregarUltimosValores() async {
+    final prefs = await SharedPreferences.getInstance();
+    final dist = prefs.getString('ultimo_distancia');
+    final cons = prefs.getString('ultimo_consumo');
+    final preco = prefs.getString('ultimo_preco');
+    final comb = prefs.getString('ultimo_combustivel');
+    final idaVolta = prefs.getBool('ultimo_ida_e_volta');
+    if (dist != null) _distanciaController.text = dist;
+    if (cons != null) _consumoController.text = cons;
+    if (preco != null) _precoController.text = preco;
+    if (comb != null) setState(() => _combustivel = comb);
+    if (idaVolta != null) setState(() => _idaEVolta = idaVolta);
+  }
+
+  Future<void> _salvarUltimosValores() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('ultimo_distancia', _distanciaController.text);
+    await prefs.setString('ultimo_consumo', _consumoController.text);
+    await prefs.setString('ultimo_preco', _precoController.text);
+    await prefs.setString('ultimo_combustivel', _combustivel);
+    await prefs.setBool('ultimo_ida_e_volta', _idaEVolta);
+  }
+
+  // ── Comparador Gasolina vs Etanol ─────────────────────────────────────────
+
+  void _calcularComparador() {
+    final gas = double.tryParse(
+        _precoGasolinaCompController.text.replaceAll(',', '.'));
+    final eta = double.tryParse(
+        _precoEtanolCompController.text.replaceAll(',', '.'));
+    if (gas == null || eta == null || gas == 0) {
+      setState(() => _comparadorMsg = null);
+      return;
+    }
+    final ratio = eta / gas;
+    final compensa = ratio < 0.70;
+    setState(() {
+      _etanolCompensa = compensa;
+      if (compensa) {
+        final pct = ((1 - ratio) * 100).toStringAsFixed(1);
+        _comparadorMsg =
+            'Etanol compensa! ${pct}% mais barato (índice: ${ratio.toStringAsFixed(2)})';
+      } else {
+        _comparadorMsg =
+            'Gasolina compensa! Use gasolina (índice: ${ratio.toStringAsFixed(2)})';
+      }
+    });
+  }
+
+  // ── Compartilhar no WhatsApp ──────────────────────────────────────────────
+
+  Future<void> _compartilharWhatsApp() async {
+    if (_resultado == null || _litrosUsados == null) return;
+    final dist = _distanciaController.text;
+    final pedagioTxt =
+        _pedagios > 0 ? '🛣️ Pedágios detectados: $_pedagios\n' : '';
+    final texto = Uri.encodeComponent(
+      '🚗 *Cálculo de Combustível*\n\n'
+      '📍 Distância: $dist km${_idaEVolta ? ' (ida e volta)' : ''}\n'
+      '⛽ Combustível: $_combustivel\n'
+      '💧 Litros necessários: ${_litrosUsados!.toStringAsFixed(2)} L\n'
+      '💰 Custo estimado: R\$ ${_resultado!.toStringAsFixed(2)}\n'
+      '$pedagioTxt'
+      '\nCalculado com *Controle de Combustível* 📱',
+    );
+    final url = Uri.parse('https://wa.me/?text=$texto');
+    if (await canLaunchUrl(url)) launchUrl(url);
+  }
+
+  // ── Widget Android ────────────────────────────────────────────────────────
+
+  Future<void> _atualizarWidget() async {
+    if (_resultado == null || _litrosUsados == null) return;
+    await HomeWidget.saveWidgetData<String>(
+        'custo', 'R\$ ${_resultado!.toStringAsFixed(2)}');
+    await HomeWidget.saveWidgetData<String>(
+        'distancia', '${_distanciaController.text} km');
+    await HomeWidget.saveWidgetData<String>('combustivel', _combustivel);
+    await HomeWidget.updateWidget(androidName: 'CombustivelWidgetProvider');
   }
 
   Future<void> _checarAtualizacao() async {
@@ -828,6 +924,8 @@ class _HomeScreenState extends State<HomeScreen> {
     _precoController.dispose();
     _origemController.dispose();
     _destinoController.dispose();
+    _precoGasolinaCompController.dispose();
+    _precoEtanolCompController.dispose();
     _origemFocus.dispose();
     _destinoFocus.dispose();
     _debounceOrigem?.cancel();
@@ -955,6 +1053,110 @@ class _HomeScreenState extends State<HomeScreen> {
                         _buildCombustivelBtn('Etanol', isDark),
                       ],
                     ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // ── Comparador Gasolina vs Etanol ─────────────────────
+              Container(
+                decoration: BoxDecoration(
+                  color: surfaceColor,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: borderColor),
+                ),
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.compare_arrows,
+                            color: _azulPrimario, size: 16),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Comparador Gasolina vs Etanol',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: _azulPrimario,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildCampo(
+                            controller: _precoGasolinaCompController,
+                            label: 'Gasolina (R\$/L)',
+                            placeholder: 'Ex: 5.89',
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                            surfaceColor: inputFill,
+                            borderColor: borderColor,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildCampo(
+                            controller: _precoEtanolCompController,
+                            label: 'Etanol (R\$/L)',
+                            placeholder: 'Ex: 3.99',
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                            surfaceColor: inputFill,
+                            borderColor: borderColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_comparadorMsg != null) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _etanolCompensa
+                              ? Colors.green.withAlpha(30)
+                              : Colors.orange.withAlpha(30),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: _etanolCompensa
+                                ? Colors.green
+                                : Colors.orange,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _etanolCompensa
+                                  ? Icons.eco
+                                  : Icons.local_gas_station,
+                              size: 16,
+                              color: _etanolCompensa
+                                  ? Colors.green
+                                  : Colors.orange,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                _comparadorMsg!,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: _etanolCompensa
+                                      ? Colors.green.shade700
+                                      : Colors.orange.shade700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -1522,6 +1724,23 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ],
                     ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _compartilharWhatsApp,
+                    icon: const Icon(Icons.share, size: 18),
+                    label: const Text('Compartilhar no WhatsApp',
+                        style: TextStyle(fontSize: 14)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF25D366),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                    ),
                   ),
                 ),
               ],

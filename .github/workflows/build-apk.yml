@@ -1,0 +1,49 @@
+name: Build e publicar APK
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Configurar Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.2'
+          channel: 'stable'
+          cache: true
+
+      - name: Criar config_secret.dart com token do Mapbox
+        run: |
+          echo "const mapboxToken = '${{ secrets.MAPBOX_TOKEN }}';" > lib/config_secret.dart
+
+      - name: Instalar dependências
+        run: flutter pub get
+
+      - name: Build APK Release
+        run: flutter build apk --release
+
+      - name: Renomear APK com versão do release
+        run: |
+          VERSION=${{ github.event.release.tag_name }}
+          cp build/app/outputs/flutter-apk/app-release.apk \
+             build/app/outputs/flutter-apk/combustivel-${VERSION}.apk
+
+      - name: Anexar APK ao Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/app/outputs/flutter-apk/combustivel-${{ github.event.release.tag_name }}.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
