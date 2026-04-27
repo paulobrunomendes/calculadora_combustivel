@@ -5,10 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 import '../config.dart';
 import '../main.dart';
 import '../models/viagem.dart';
 import '../services/historico_service.dart';
+import '../services/update_service.dart';
 import 'historico_screen.dart';
 import 'tabela_consumo_screen.dart';
 import 'gps_screen.dart';
@@ -81,6 +83,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checarAtualizacao());
     _origemFocus.addListener(() {
       if (!_origemFocus.hasFocus) {
         Future.delayed(const Duration(milliseconds: 200), () {
@@ -745,6 +748,77 @@ class _HomeScreenState extends State<HomeScreen> {
           : null,
     );
     HistoricoService.adicionarViagem(viagem);
+  }
+
+  Future<void> _checarAtualizacao() async {
+    final info = await UpdateService.verificar();
+    if (info == null || !mounted) return;
+    _mostrarDialogAtualizacao(info);
+  }
+
+  void _mostrarDialogAtualizacao(UpdateInfo info) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.system_update, color: Color(0xFF2563EB)),
+            const SizedBox(width: 10),
+            Text('Versão ${info.versao} disponível',
+                style: const TextStyle(fontSize: 16)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Uma nova versão do app está disponível. Atualize para ter as últimas melhorias e correções.',
+              style: TextStyle(fontSize: 14),
+            ),
+            if (info.notas.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2563EB).withAlpha(20),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  info.notas,
+                  style: const TextStyle(fontSize: 12),
+                  maxLines: 5,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Agora não'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final uri = Uri.parse(info.downloadUrl);
+              if (await canLaunchUrl(uri)) launchUrl(uri);
+            },
+            icon: const Icon(Icons.download, size: 18),
+            label: const Text('Baixar atualização'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2563EB),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
