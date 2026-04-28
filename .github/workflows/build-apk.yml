@@ -39,11 +39,20 @@ jobs:
         run: |
           echo "const mapboxToken = '${{ secrets.MAPBOX_TOKEN }}';" > lib/config_secret.dart
 
+      - name: Aceitar licenças Android SDK
+        run: yes | sdkmanager --licenses || true
+
+      - name: Instalar plataforma Android necessária
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0" || true
+
       - name: Instalar dependências
         run: flutter pub get
 
+      - name: Verificar ambiente Flutter
+        run: flutter doctor -v
+
       - name: Build APK Release
-        run: flutter build apk --release
+        run: flutter build apk --release --verbose 2>&1 | tail -100
 
       - name: Renomear APK
         run: |
