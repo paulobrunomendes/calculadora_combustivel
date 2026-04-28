@@ -42,8 +42,8 @@ jobs:
       - name: Aceitar licenças Android SDK
         run: yes | sdkmanager --licenses || true
 
-      - name: Instalar plataforma Android necessária
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0" || true
+      - name: Instalar plataforma Android e NDK necessários
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;28.2.13676358"
 
       - name: Instalar dependências
         run: flutter pub get
