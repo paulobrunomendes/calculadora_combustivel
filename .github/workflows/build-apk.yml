@@ -28,6 +28,12 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
+      - name: Cache keystore de assinatura (garante chave consistente entre builds)
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: android-signing-keystore-v1
+
       - name: Configurar Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -48,27 +54,6 @@ jobs:
 
       - name: Instalar plataforma Android necessária
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0" || true
-
-      - name: Configurar keystore de release
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-        run: |
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            if python3 -c "import base64,os; open('android/app/release.keystore','wb').write(base64.b64decode(os.environ['KEYSTORE_BASE64'].strip()))"; then
-              echo "storePassword=$STORE_PASSWORD" > android/app/key.properties
-              echo "keyPassword=$KEY_PASSWORD" >> android/app/key.properties
-              echo "keyAlias=$KEY_ALIAS" >> android/app/key.properties
-              echo "storeFile=release.keystore" >> android/app/key.properties
-              echo "Keystore configurado OK"
-            else
-              echo "AVISO: decode base64 falhou — usando debug keystore"
-            fi
-          else
-            echo "KEYSTORE_BASE64 nao configurado — usando debug keystore"
-          fi
 
       - name: Instalar dependências
         run: flutter pub get
