@@ -825,10 +825,16 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _compartilharWhatsApp() async {
     if (_resultado == null || _litrosUsados == null) return;
     final dist = _distanciaController.text;
+    final origem = _origemController.text.trim();
+    final destino = _destinoController.text.trim();
     final pedagioTxt =
         _pedagios > 0 ? '🛣️ Pedágios detectados: $_pedagios\n' : '';
+    final rotaTxt = (origem.isNotEmpty && destino.isNotEmpty)
+        ? '🔵 Origem: $origem\n🔴 Destino: $destino\n'
+        : '';
     final texto = Uri.encodeComponent(
       '🚗 *Cálculo de Combustível*\n\n'
+      '$rotaTxt'
       '📍 Distância: $dist km${_idaEVolta ? ' (ida e volta)' : ''}\n'
       '⛽ Combustível: $_combustivel\n'
       '💧 Litros necessários: ${_litrosUsados!.toStringAsFixed(2)} L\n'

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' show min, max;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -29,6 +30,12 @@ class _RotaScreenState extends State<RotaScreen> {
   // Edição de rota
   List<LatLng> _waypoints = [];
   bool _modoEdicao = false;
+
+  // Postos e carregadores
+  List<LatLng> _postosGasolina = [];
+  List<LatLng> _postosCarga = [];
+  bool _mostrarPostos = false;
+  bool _buscandoPostos = false;
 
   static const _azulPrimario = Color(0xFF2563EB);
   static const _fundo = Color(0xFFf0f4ff);
@@ -75,10 +82,10 @@ class _RotaScreenState extends State<RotaScreen> {
       '?geometries=geojson&alternatives=true&access_token=$mapboxToken',
     );
     final resp = await http.get(url);
-    if (resp.statusCode != 200) return ([], 0.0, 0.0);
+    if (resp.statusCode != 200) return (<LatLng>[], 0.0, 0.0);
     final data = jsonDecode(resp.body) as Map<String, dynamic>;
     final routes = data['routes'] as List;
-    if (routes.isEmpty) return ([], 0.0, 0.0);
+    if (routes.isEmpty) return (<LatLng>[], 0.0, 0.0);
     // Seleciona a rota de menor distância
     routes.sort((a, b) =>
         (a['distance'] as num).compareTo(b['distance'] as num));
@@ -204,6 +211,79 @@ class _RotaScreenState extends State<RotaScreen> {
     }
   }
 
+  Future<void> _buscarPostosNaRota() async {
+    if (_rotaPontos.isEmpty) return;
+    setState(() => _buscandoPostos = true);
+
+    // Calcula bounding box da rota com buffer de ~0.5 graus
+    double minLat = _rotaPontos.map((p) => p.latitude).reduce(min);
+    double maxLat = _rotaPontos.map((p) => p.latitude).reduce(max);
+    double minLon = _rotaPontos.map((p) => p.longitude).reduce(min);
+    double maxLon = _rotaPontos.map((p) => p.longitude).reduce(max);
+    const buf = 0.1;
+    final bbox = '${minLat - buf},${minLon - buf},${maxLat + buf},${maxLon + buf}';
+
+    final query = '''
+[out:json][timeout:20];
+(
+  node["amenity"="fuel"]($bbox);
+  node["amenity"="charging_station"]($bbox);
+);
+out body;
+''';
+
+    try {
+      final resp = await http
+          .post(
+            Uri.parse('https://overpass-api.de/api/interpreter'),
+            body: query,
+          )
+          .timeout(const Duration(seconds: 25));
+
+      if (resp.statusCode != 200) {
+        setState(() => _buscandoPostos = false);
+        return;
+      }
+
+      final data = jsonDecode(resp.body) as Map<String, dynamic>;
+      final elementos = (data['elements'] as List).cast<Map<String, dynamic>>();
+
+      final gasolina = <LatLng>[];
+      final carga = <LatLng>[];
+
+      for (final el in elementos) {
+        final lat = (el['lat'] as num).toDouble();
+        final lon = (el['lon'] as num).toDouble();
+        final ponto = LatLng(lat, lon);
+        // Filtra apenas pontos próximos à rota (~8 km)
+        if (_ptoProximoDaRota(ponto, limiteKm: 8)) {
+          if (el['tags']?['amenity'] == 'fuel') {
+            gasolina.add(ponto);
+          } else {
+            carga.add(ponto);
+          }
+        }
+      }
+
+      setState(() {
+        _postosGasolina = gasolina;
+        _postosCarga = carga;
+        _buscandoPostos = false;
+        _mostrarPostos = true;
+      });
+    } catch (_) {
+      setState(() => _buscandoPostos = false);
+    }
+  }
+
+  bool _ptoProximoDaRota(LatLng ponto, {required double limiteKm}) {
+    const distCalc = Distance();
+    for (final rotaPonto in _rotaPontos) {
+      if (distCalc(ponto, rotaPonto) / 1000 <= limiteKm) return true;
+    }
+    return false;
+  }
+
   @override
   void dispose() {
     _origemController.dispose();
@@ -226,6 +306,38 @@ class _RotaScreenState extends State<RotaScreen> {
         iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
         actions: [
+          if (_rotaPontos.isNotEmpty)
+            _buscandoPostos
+                ? const Padding(
+                    padding: EdgeInsets.all(14),
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    ),
+                  )
+                : IconButton(
+                    icon: Icon(
+                      Icons.local_gas_station,
+                      color: _mostrarPostos
+                          ? Colors.yellowAccent
+                          : Colors.white,
+                    ),
+                    tooltip: _mostrarPostos
+                        ? 'Ocultar postos'
+                        : 'Mostrar postos e carregadores',
+                    onPressed: () {
+                      if (_mostrarPostos) {
+                        setState(() => _mostrarPostos = false);
+                      } else if (_postosGasolina.isEmpty &&
+                          _postosCarga.isEmpty) {
+                        _buscarPostosNaRota();
+                      } else {
+                        setState(() => _mostrarPostos = true);
+                      }
+                    },
+                  ),
           if (_pontoDestino != null)
             IconButton(
               icon: const Icon(Icons.navigation, color: Colors.white),
@@ -497,6 +609,18 @@ class _RotaScreenState extends State<RotaScreen> {
                           (i) => _buildWaypointMarker(_waypoints[i], i),
                         ),
                       ),
+                    if (_mostrarPostos && _postosGasolina.isNotEmpty)
+                      MarkerLayer(
+                        markers: _postosGasolina
+                            .map((p) => _buildPostoMarker(p, tipo: 'gasolina'))
+                            .toList(),
+                      ),
+                    if (_mostrarPostos && _postosCarga.isNotEmpty)
+                      MarkerLayer(
+                        markers: _postosCarga
+                            .map((p) => _buildPostoMarker(p, tipo: 'carga'))
+                            .toList(),
+                      ),
                     const RichAttributionWidget(
                       attributions: [
                         TextSourceAttribution('Mapbox'),
@@ -505,6 +629,75 @@ class _RotaScreenState extends State<RotaScreen> {
                     ),
                   ],
                 ),
+                // Legenda de postos
+                if (_mostrarPostos &&
+                    (_postosGasolina.isNotEmpty || _postosCarga.isNotEmpty))
+                  Positioned(
+                    bottom: 16,
+                    left: 16,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withAlpha(230),
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: [
+                          BoxShadow(
+                              color: Colors.black.withAlpha(30),
+                              blurRadius: 4),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_postosGasolina.isNotEmpty)
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 14,
+                                  height: 14,
+                                  decoration: const BoxDecoration(
+                                      color: Colors.orange,
+                                      shape: BoxShape.circle),
+                                  child: const Icon(Icons.local_gas_station,
+                                      size: 9, color: Colors.white),
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  '${_postosGasolina.length} posto${_postosGasolina.length > 1 ? 's' : ''}',
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          if (_postosGasolina.isNotEmpty &&
+                              _postosCarga.isNotEmpty)
+                            const SizedBox(height: 4),
+                          if (_postosCarga.isNotEmpty)
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 14,
+                                  height: 14,
+                                  decoration: const BoxDecoration(
+                                      color: Colors.green,
+                                      shape: BoxShape.circle),
+                                  child: const Icon(Icons.ev_station,
+                                      size: 9, color: Colors.white),
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  '${_postosCarga.length} carregador${_postosCarga.length > 1 ? 'es' : ''}',
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
                 // Loading overlay
                 if (_carregando)
                   Positioned(
@@ -546,6 +739,36 @@ class _RotaScreenState extends State<RotaScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Marker _buildPostoMarker(LatLng ponto, {required String tipo}) {
+    final isGasolina = tipo == 'gasolina';
+    return Marker(
+      point: ponto,
+      width: 28,
+      height: 28,
+      child: Tooltip(
+        message: isGasolina ? 'Posto de combustível' : 'Carregador elétrico',
+        child: Container(
+          decoration: BoxDecoration(
+            color: isGasolina ? Colors.orange : Colors.green,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withAlpha(60),
+                  blurRadius: 3,
+                  offset: const Offset(0, 1)),
+            ],
+          ),
+          child: Icon(
+            isGasolina ? Icons.local_gas_station : Icons.ev_station,
+            color: Colors.white,
+            size: 15,
+          ),
+        ),
       ),
     );
   }
