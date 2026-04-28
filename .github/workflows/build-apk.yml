@@ -30,7 +30,7 @@ jobs:
 
       - name: Decodificar keystore de assinatura
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | tr -d '\r\n ' | base64 -d > android/app/release.keystore
 
       - name: Configurar Flutter
         uses: subosito/flutter-action@v2
