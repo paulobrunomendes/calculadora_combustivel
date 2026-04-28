@@ -118,6 +118,9 @@ class _RotaScreenState extends State<RotaScreen> {
       _modoEdicao = false;
       _tempoViagem = null;
       _distanciaKm = null;
+      _postosGasolina = [];
+      _postosCarga = [];
+      _mostrarPostos = false;
     });
 
     try {
@@ -157,6 +160,7 @@ class _RotaScreenState extends State<RotaScreen> {
           padding: const EdgeInsets.all(70),
         ),
       );
+      _buscarPostosNaRota();
     } catch (e) {
       setState(() {
         _erro = 'Erro ao buscar rota. Verifique sua conexão.';
@@ -203,6 +207,7 @@ class _RotaScreenState extends State<RotaScreen> {
           padding: const EdgeInsets.all(70),
         ),
       );
+      _buscarPostosNaRota();
     } catch (_) {
       setState(() {
         _erro = 'Erro ao recalcular rota.';

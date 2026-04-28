@@ -1,6 +1,6 @@
 name: combustivel_app
 description: Aplicativo de controle de combustível
-version: 1.0.5+6
+version: 1.0.6+7
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
