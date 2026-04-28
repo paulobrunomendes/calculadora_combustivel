@@ -472,12 +472,14 @@ class _HomeScreenState extends State<HomeScreen> {
           ');'
           'out center body;';
 
-      final resp = await http.post(
-        Uri.parse('https://overpass-api.de/api/interpreter'),
-        body: {'data': query},
-      );
+      final resp = await http
+          .post(
+            Uri.parse('https://overpass-api.de/api/interpreter'),
+            body: {'data': query},
+          )
+          .timeout(const Duration(seconds: 30));
 
-      if (resp.statusCode != 200) throw Exception('Overpass error');
+      if (resp.statusCode != 200) throw Exception('status ${resp.statusCode}');
 
       final data = jsonDecode(resp.body) as Map<String, dynamic>;
       final elements = data['elements'] as List;
@@ -560,9 +562,12 @@ class _HomeScreenState extends State<HomeScreen> {
         _mostrarPostos = postos.isNotEmpty;
         _buscandoPostos = false;
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() => _buscandoPostos = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao buscar postos: $e')),
+      );
     }
   }
 
@@ -604,12 +609,14 @@ class _HomeScreenState extends State<HomeScreen> {
           ');'
           'out center body;';
 
-      final resp = await http.post(
-        Uri.parse('https://overpass-api.de/api/interpreter'),
-        body: {'data': query},
-      );
+      final resp = await http
+          .post(
+            Uri.parse('https://overpass-api.de/api/interpreter'),
+            body: {'data': query},
+          )
+          .timeout(const Duration(seconds: 30));
 
-      if (resp.statusCode != 200) throw Exception('Overpass error');
+      if (resp.statusCode != 200) throw Exception('status ${resp.statusCode}');
 
       final data = jsonDecode(resp.body) as Map<String, dynamic>;
       final elements = data['elements'] as List;
@@ -686,9 +693,12 @@ class _HomeScreenState extends State<HomeScreen> {
         _mostrarCarregadores = carregadores.isNotEmpty;
         _buscandoCarregadores = false;
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() => _buscandoCarregadores = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao buscar carregadores: $e')),
+      );
     }
   }
 
