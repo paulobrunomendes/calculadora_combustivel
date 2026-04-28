@@ -238,12 +238,18 @@ out center;
       final resp = await http
           .post(
             Uri.parse('https://overpass-api.de/api/interpreter'),
-            body: query,
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'data=${Uri.encodeComponent(query)}',
           )
-          .timeout(const Duration(seconds: 25));
+          .timeout(const Duration(seconds: 30));
 
       if (resp.statusCode != 200) {
-        setState(() => _buscandoPostos = false);
+        if (mounted) {
+          setState(() => _buscandoPostos = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Erro ao buscar postos (servidor indisponível)')),
+          );
+        }
         return;
       }
 
@@ -282,8 +288,18 @@ out center;
         _buscandoPostos = false;
         _mostrarPostos = true;
       });
-    } catch (_) {
-      setState(() => _buscandoPostos = false);
+      if (gasolina.isEmpty && carga.isEmpty && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Nenhum posto encontrado próximo à rota')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _buscandoPostos = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Falha ao buscar postos: $e')),
+        );
+      }
     }
   }
 
