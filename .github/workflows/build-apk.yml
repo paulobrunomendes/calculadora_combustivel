@@ -38,11 +38,16 @@ jobs:
         run: |
           echo "const mapboxToken = '${{ secrets.MAPBOX_TOKEN }}';" > lib/config_secret.dart
 
+      - name: Configurar NDK 28 (requerido pelo pacote jni)
+        run: |
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> $GITHUB_ENV
+          echo "ANDROID_NDK=$ANDROID_HOME/ndk/28.2.13676358" >> $GITHUB_ENV
+
       - name: Aceitar licenças Android SDK
         run: yes | sdkmanager --licenses || true
 
       - name: Instalar plataforma Android necessária
-        run: sdkmanager "platforms;android-34" "build-tools;34.0.0" || true
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0" || true
 
       - name: Instalar dependências
         run: flutter pub get
@@ -51,7 +56,23 @@ jobs:
         run: flutter doctor -v
 
       - name: Build APK Release
-        run: flutter build apk --release
+        id: build_apk
+        run: |
+          set -o pipefail
+          flutter build apk --release 2>&1 | tee /tmp/flutter_build.log
+
+      - name: Mostrar erros no summary (se falhou)
+        if: failure()
+        run: |
+          echo "## Build Failure Details" >> $GITHUB_STEP_SUMMARY
+          echo '### Erros encontrados:' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          grep -E "(FAILURE|error:|Exception|Caused by|BUILD FAILED|what went wrong)" /tmp/flutter_build.log | tail -40 >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo '### Últimas 80 linhas:' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tail -80 /tmp/flutter_build.log >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Renomear APK
         run: |
