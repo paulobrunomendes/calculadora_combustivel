@@ -224,12 +224,14 @@ class _RotaScreenState extends State<RotaScreen> {
     final bbox = '${minLat - buf},${minLon - buf},${maxLat + buf},${maxLon + buf}';
 
     final query = '''
-[out:json][timeout:20];
+[out:json][timeout:25];
 (
   node["amenity"="fuel"]($bbox);
+  way["amenity"="fuel"]($bbox);
   node["amenity"="charging_station"]($bbox);
+  way["amenity"="charging_station"]($bbox);
 );
-out body;
+out center;
 ''';
 
     try {
@@ -252,8 +254,17 @@ out body;
       final carga = <LatLng>[];
 
       for (final el in elementos) {
-        final lat = (el['lat'] as num).toDouble();
-        final lon = (el['lon'] as num).toDouble();
+        double lat, lon;
+        if (el.containsKey('center')) {
+          final c = el['center'] as Map<String, dynamic>;
+          lat = (c['lat'] as num).toDouble();
+          lon = (c['lon'] as num).toDouble();
+        } else if (el.containsKey('lat') && el.containsKey('lon')) {
+          lat = (el['lat'] as num).toDouble();
+          lon = (el['lon'] as num).toDouble();
+        } else {
+          continue;
+        }
         final ponto = LatLng(lat, lon);
         // Filtra apenas pontos próximos à rota (~8 km)
         if (_ptoProximoDaRota(ponto, limiteKm: 8)) {
