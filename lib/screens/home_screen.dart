@@ -865,101 +865,69 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _mostrarDialogAtualizacao(UpdateInfo info) {
-    double? progresso;
-    bool baixando = false;
-
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(
-            children: [
-              const Icon(Icons.system_update, color: Color(0xFF2563EB)),
-              const SizedBox(width: 10),
-              Text('Versão ${info.versao} disponível',
-                  style: const TextStyle(fontSize: 16)),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Uma nova versão do app está disponível. Atualize para ter as últimas melhorias e correções.',
-                style: TextStyle(fontSize: 14),
-              ),
-              if (info.notas.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2563EB).withAlpha(20),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    info.notas,
-                    style: const TextStyle(fontSize: 12),
-                    maxLines: 5,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-              if (baixando) ...[
-                const SizedBox(height: 16),
-                LinearProgressIndicator(
-                  value: progresso,
-                  backgroundColor: const Color(0xFF2563EB).withAlpha(30),
-                  color: const Color(0xFF2563EB),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  progresso == null
-                      ? 'Iniciando download...'
-                      : 'Baixando... ${(progresso! * 100).toInt()}%',
-                  style: const TextStyle(fontSize: 12),
-                ),
-              ],
-            ],
-          ),
-          actions: [
-            if (!baixando)
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Agora não'),
-              ),
-            ElevatedButton.icon(
-              onPressed: baixando
-                  ? null
-                  : () async {
-                      setDialogState(() => baixando = true);
-                      await UpdateService.baixarEInstalar(
-                        info.downloadUrl,
-                        onProgress: (p) =>
-                            setDialogState(() => progresso = p),
-                      );
-                      if (ctx.mounted) Navigator.pop(ctx);
-                    },
-              icon: baixando
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Icon(Icons.download, size: 18),
-              label: Text(baixando ? 'Baixando...' : 'Instalar agora'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2563EB),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
-              ),
-            ),
+      builder: (ctx) => AlertDialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.system_update, color: Color(0xFF2563EB)),
+            const SizedBox(width: 10),
+            Text('Versão ${info.versao} disponível',
+                style: const TextStyle(fontSize: 16)),
           ],
         ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Uma nova versão do app está disponível. Atualize para ter as últimas melhorias e correções.',
+              style: TextStyle(fontSize: 14),
+            ),
+            if (info.notas.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2563EB).withAlpha(20),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  info.notas,
+                  style: const TextStyle(fontSize: 12),
+                  maxLines: 5,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Agora não'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              launchUrl(
+                Uri.parse(info.downloadUrl),
+                mode: LaunchMode.externalApplication,
+              );
+              Navigator.pop(ctx);
+            },
+            icon: const Icon(Icons.download, size: 18),
+            label: const Text('Baixar atualização'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2563EB),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
+        ],
       ),
     );
   }
