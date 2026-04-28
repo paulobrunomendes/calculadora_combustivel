@@ -52,7 +52,7 @@ jobs:
         run: flutter doctor -v
 
       - name: Build APK Release
-        run: flutter build apk --release --verbose 2>&1 | tail -100
+        run: flutter build apk --release
 
       - name: Renomear APK
         run: |
