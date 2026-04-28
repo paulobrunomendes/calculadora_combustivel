@@ -30,9 +30,12 @@ class UpdateService {
           .get(
             Uri.parse(
                 'https://api.github.com/repos/$_owner/$_repo/releases/latest'),
-            headers: {'Accept': 'application/vnd.github+json'},
+            headers: {
+              'Accept': 'application/vnd.github+json',
+              'User-Agent': 'AbastSmart-App',
+            },
           )
-          .timeout(const Duration(seconds: 8));
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode != 200) return null;
 
