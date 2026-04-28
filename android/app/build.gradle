@@ -30,17 +30,19 @@ android {
         abortOnError false
     }
 
+    def keystorePropertiesFile = rootProject.file("key.properties")
+    def keystoreProperties = new Properties()
+    if (keystorePropertiesFile.exists()) {
+        keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+    }
+
     signingConfigs {
         release {
-            def kPath = System.getenv("KEYSTORE_PATH")
-            def kPass = System.getenv("KEYSTORE_PASSWORD")
-            def kAlias = System.getenv("KEY_ALIAS")
-            def kKeyPass = System.getenv("KEY_PASSWORD")
-            if (kPath != null && kPass != null) {
-                storeFile file(kPath)
-                storePassword kPass
-                keyAlias kAlias ?: 'abast-smart'
-                keyPassword kKeyPass ?: kPass
+            if (keystorePropertiesFile.exists()) {
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
             } else {
                 storeFile file("${System.getProperty('user.home')}/.android/debug.keystore")
                 storePassword 'android'

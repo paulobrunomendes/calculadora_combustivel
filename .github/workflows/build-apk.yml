@@ -28,9 +28,13 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Decodificar keystore de assinatura
+      - name: Decodificar keystore e criar key.properties
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | tr -d '\r\n ' | base64 -d > android/app/release.keystore
+          echo "storeFile=${{ github.workspace }}/android/app/release.keystore" > android/key.properties
+          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> android/key.properties
+          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
+          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
 
       - name: Configurar Flutter
         uses: subosito/flutter-action@v2
@@ -61,11 +65,6 @@ jobs:
 
       - name: Build APK Release
         id: build_apk
-        env:
-          KEYSTORE_PATH: ${{ github.workspace }}/android/app/release.keystore
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           set -o pipefail
           flutter build apk --release 2>&1 | tee /tmp/flutter_build.log
