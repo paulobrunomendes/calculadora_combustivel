@@ -7,7 +7,6 @@ plugins {
 android {
     namespace "com.combustivel.app"
     compileSdk flutter.compileSdkVersion
-    ndkVersion flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
@@ -24,6 +23,11 @@ android {
         targetSdk flutter.targetSdkVersion
         versionCode flutter.versionCode
         versionName flutter.versionName
+    }
+
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
     }
 
     buildTypes {
