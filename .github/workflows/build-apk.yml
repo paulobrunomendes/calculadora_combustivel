@@ -58,12 +58,10 @@ jobs:
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "$KEYSTORE_BASE64" | base64 --decode > android/app/release.keystore
-            cat > android/app/key.properties << EOF
-storePassword=${STORE_PASSWORD}
-keyPassword=${KEY_PASSWORD}
-keyAlias=${KEY_ALIAS}
-storeFile=release.keystore
-EOF
+            echo "storePassword=${STORE_PASSWORD}" > android/app/key.properties
+            echo "keyPassword=${KEY_PASSWORD}" >> android/app/key.properties
+            echo "keyAlias=${KEY_ALIAS}" >> android/app/key.properties
+            echo "storeFile=release.keystore" >> android/app/key.properties
             echo "Keystore de release configurado."
           else
             echo "Sem KEYSTORE_BASE64 — build usará debug keystore."
