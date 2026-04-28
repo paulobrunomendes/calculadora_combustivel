@@ -28,21 +28,9 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Cache keystore de assinatura (garante chave consistente entre builds)
-        uses: actions/cache@v4
-        with:
-          path: ~/.android/debug.keystore
-          key: android-signing-keystore-v1
-
-      - name: Criar keystore se não veio do cache
+      - name: Decodificar keystore de assinatura
         run: |
-          mkdir -p ~/.android
-          if [ ! -f ~/.android/debug.keystore ]; then
-            keytool -genkey -v -keystore ~/.android/debug.keystore \
-              -storepass android -alias androiddebugkey -keypass android \
-              -keyalg RSA -keysize 2048 -validity 10000 \
-              -dname "CN=Android Debug,O=Android,C=US"
-          fi
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
 
       - name: Configurar Flutter
         uses: subosito/flutter-action@v2
@@ -73,6 +61,11 @@ jobs:
 
       - name: Build APK Release
         id: build_apk
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/android/app/release.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           set -o pipefail
           flutter build apk --release 2>&1 | tee /tmp/flutter_build.log

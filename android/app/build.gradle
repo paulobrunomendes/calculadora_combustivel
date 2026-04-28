@@ -30,9 +30,29 @@ android {
         abortOnError false
     }
 
+    signingConfigs {
+        release {
+            def kPath = System.getenv("KEYSTORE_PATH")
+            def kPass = System.getenv("KEYSTORE_PASSWORD")
+            def kAlias = System.getenv("KEY_ALIAS")
+            def kKeyPass = System.getenv("KEY_PASSWORD")
+            if (kPath != null && kPass != null) {
+                storeFile file(kPath)
+                storePassword kPass
+                keyAlias kAlias ?: 'abast-smart'
+                keyPassword kKeyPass ?: kPass
+            } else {
+                storeFile file("${System.getProperty('user.home')}/.android/debug.keystore")
+                storePassword 'android'
+                keyAlias 'androiddebugkey'
+                keyPassword 'android'
+            }
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
         }
     }
 }

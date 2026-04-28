@@ -475,7 +475,11 @@ class _HomeScreenState extends State<HomeScreen> {
       final resp = await http
           .post(
             Uri.parse('https://overpass-api.de/api/interpreter'),
-            body: {'data': query},
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'User-Agent': 'AbastSmart-App',
+            },
+            body: 'data=${Uri.encodeComponent(query)}',
           )
           .timeout(const Duration(seconds: 30));
 
@@ -612,7 +616,11 @@ class _HomeScreenState extends State<HomeScreen> {
       final resp = await http
           .post(
             Uri.parse('https://overpass-api.de/api/interpreter'),
-            body: {'data': query},
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'User-Agent': 'AbastSmart-App',
+            },
+            body: 'data=${Uri.encodeComponent(query)}',
           )
           .timeout(const Duration(seconds: 30));
 
@@ -868,6 +876,30 @@ class _HomeScreenState extends State<HomeScreen> {
     await HomeWidget.updateWidget(androidName: 'CombustivelWidgetProvider');
   }
 
+  Future<void> _baixarEInstalar(String url) async {
+    final snack = ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(children: [
+          SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+          SizedBox(width: 12),
+          Text('Baixando atualização...'),
+        ]),
+        duration: Duration(minutes: 5),
+      ),
+    );
+    try {
+      await UpdateService.baixarEInstalar(url);
+      snack.close();
+    } catch (_) {
+      snack.close();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erro ao baixar. Tente novamente.')),
+        );
+      }
+    }
+  }
+
   Future<void> _checarAtualizacao() async {
     final info = await UpdateService.verificar();
     if (info == null || !mounted) return;
@@ -922,14 +954,11 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           ElevatedButton.icon(
             onPressed: () {
-              launchUrl(
-                Uri.parse(info.downloadUrl),
-                mode: LaunchMode.externalApplication,
-              );
               Navigator.pop(ctx);
+              _baixarEInstalar(info.downloadUrl);
             },
             icon: const Icon(Icons.download, size: 18),
-            label: const Text('Baixar atualização'),
+            label: const Text('Atualizar agora'),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF2563EB),
               foregroundColor: Colors.white,
